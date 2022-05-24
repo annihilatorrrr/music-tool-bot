@@ -70,9 +70,7 @@ def increment_usage_counter_for_user(user_id: int) -> int:
     **Returns:**
      The new value for `user.number_of_files_sent`
     """
-    user = User.where('user_id', '=', user_id).first()
-
-    if user:
+    if user := User.where('user_id', '=', user_id).first():
         user.number_of_files_sent = user.number_of_files_sent + 1
         user.push()
 
@@ -146,13 +144,10 @@ def save_text_into_tag(
      - current_tag (str) -- The key to store the value into
      - context (CallbackContext) -- The context of a user to store the key:value pair into
     """
-    if is_number:
-        if isinstance(int(value), int):
-            context.user_data['tag_editor'][current_tag] = value
-        else:
-            context.user_data['tag_editor'][current_tag] = 0
-    else:
+    if is_number and isinstance(int(value), int) or not is_number:
         context.user_data['tag_editor'][current_tag] = value
+    else:
+        context.user_data['tag_editor'][current_tag] = 0
 
 
 def create_user_directory(user_id: int) -> str:
@@ -168,7 +163,7 @@ def create_user_directory(user_id: int) -> str:
 
     try:
         Path(user_download_dir).mkdir(parents=True, exist_ok=True)
-    except (OSError, FileNotFoundError, BaseException) as error:
+    except BaseException as error:
         raise Exception(f"Can't create directory for user_id: {user_id}") from error
 
     return user_download_dir
@@ -186,11 +181,9 @@ def convert_seconds_to_human_readable_form(seconds: int) -> str:
     if seconds <= 0:
         return "00:00"
 
-    minutes = int(seconds / 60)
-    remainder = seconds % 60
-
-    minutes_formatted = str(minutes) if minutes >= 10 else "0" + str(minutes)
-    seconds_formatted = str(remainder) if remainder >= 10 else "0" + str(remainder)
+    minutes, remainder = divmod(seconds, 60)
+    minutes_formatted = str(minutes) if minutes >= 10 else f"0{str(minutes)}"
+    seconds_formatted = str(remainder) if remainder >= 10 else f"0{str(remainder)}"
 
     return f"{minutes_formatted}:{seconds_formatted}"
 
@@ -356,10 +349,10 @@ def save_tags_to_file(file: str, tags: dict, new_art_path: str) -> str:
     except OSError as error:
         raise Exception("Couldn't set hashtags") from error
 
-    music['artist'] = tags['artist'] if tags['artist'] else ''
-    music['title'] = tags['title'] if tags['title'] else ''
-    music['album'] = tags['album'] if tags['album'] else ''
-    music['genre'] = tags['genre'] if tags['genre'] else ''
+    music['artist'] = tags['artist'] or ''
+    music['title'] = tags['title'] or ''
+    music['album'] = tags['album'] or ''
+    music['genre'] = tags['genre'] or ''
     music['year'] = int(tags['year']) if tags['year'] else 0
     music['disknumber'] = int(tags['disknumber']) if tags['disknumber'] else 0
     music['tracknumber'] = int(tags['tracknumber']) if tags['tracknumber'] else 0
@@ -377,15 +370,15 @@ def parse_cutting_range(text: str) -> (int, int):
         raise ValueError('Malformed music range')
 
     if ':' in text:
-        beginning_sec = int(beginning.partition(':')[0].lstrip('0') if
-                            beginning.partition(':')[0].lstrip('0') else 0) * 60 \
-                        + int(beginning.partition(':')[2].lstrip('0') if
-                              beginning.partition(':')[2].lstrip('0') else 0)
+        beginning_sec = (
+            int(beginning.partition(':')[0].lstrip('0') or 0) * 60
+        ) + int(beginning.partition(':')[2].lstrip('0') or 0)
 
-        ending_sec = int(ending.partition(':')[0].lstrip('0') if
-                         ending.partition(':')[0].lstrip('0') else 0) * 60 \
-            + int(ending.partition(':')[2].lstrip('0') if
-                  ending.partition(':')[2].lstrip('0') else 0)
+
+        ending_sec = (
+            int(ending.partition(':')[0].lstrip('0') or 0) * 60
+        ) + int(ending.partition(':')[2].lstrip('0') or 0)
+
     else:
         beginning_sec = int(beginning)
         ending_sec = int(ending)
@@ -419,10 +412,7 @@ def pretty_print_size(number_of_bytes: float) -> str:
 
     if isinstance(suffix, tuple):
         singular, multiple = suffix
-        if amount == 1:
-            suffix = singular
-        else:
-            suffix = multiple
+        suffix = singular if amount == 1 else multiple
     return str(amount) + suffix
 
 

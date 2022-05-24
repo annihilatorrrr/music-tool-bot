@@ -293,10 +293,11 @@ def command_list_users(update: Update, _context: CallbackContext) -> None:
     if is_user_admin(update.effective_user.id):
         users = User.all()
 
-        reply_message = ''
+        reply_message = ''.join(
+            f"{user.user_id}: {f'@{user.username}' if user.username else '-'}\n"
+            for user in users
+        )
 
-        for user in users:
-            reply_message += f"{user.user_id}: {f'@{user.username}' if user.username else '-'}\n"
 
         update.message.reply_text(
             f"👥 List of all users ({len(users)} in total):\n\n"
@@ -416,10 +417,7 @@ def handle_photo_message(update: Update, context: CallbackContext) -> None:
 
     if music_path:
         if current_active_module == 'tag_editor':
-            if not current_tag or current_tag != 'album_art':
-                reply_message = translate_key_to(lp.ASK_WHICH_TAG, lang)
-                message.reply_text(reply_message, reply_markup=tag_editor_keyboard)
-            else:
+            if current_tag and current_tag == 'album_art':
                 try:
                     file_download_path = download_file(
                         user_id=user_id,
@@ -433,7 +431,7 @@ def handle_photo_message(update: Update, context: CallbackContext) -> None:
                                     f"{translate_key_to(lp.CLICK_DONE_MESSAGE, lang).lower()}"
                     user_data['new_art_path'] = file_download_path
                     message.reply_text(reply_message, reply_markup=tag_editor_keyboard)
-                except (ValueError, BaseException):
+                except BaseException:
                     message.reply_text(translate_key_to(lp.ERR_ON_DOWNLOAD_AUDIO_MESSAGE, lang))
                     logger.error(
                         "Error on downloading %s's file. File type: Photo",
@@ -441,6 +439,9 @@ def handle_photo_message(update: Update, context: CallbackContext) -> None:
                         exc_info=True
                     )
                     return
+            else:
+                reply_message = translate_key_to(lp.ASK_WHICH_TAG, lang)
+                message.reply_text(reply_message, reply_markup=tag_editor_keyboard)
     else:
         reply_message = translate_key_to(lp.DEFAULT_MESSAGE, lang)
         message.reply_text(reply_message, reply_markup=ReplyKeyboardRemove())
@@ -566,10 +567,8 @@ def handle_responses(update: Update, context: CallbackContext) -> None:
     if current_active_module == 'tag_editor':
         if not current_tag:
             reply_message = translate_key_to(lp.ASK_WHICH_TAG, lang)
-            message.reply_text(reply_message, reply_markup=tag_editor_keyboard)
         elif current_tag == 'album_art':
             reply_message = translate_key_to(lp.ASK_FOR_ALBUM_ART, lang)
-            message.reply_text(reply_message, reply_markup=tag_editor_keyboard)
         else:
             save_text_into_tag(
                 value=message_text,
@@ -581,11 +580,11 @@ def handle_responses(update: Update, context: CallbackContext) -> None:
                             f"{translate_key_to(lp.CLICK_PREVIEW_MESSAGE, lang)} " \
                             f"{translate_key_to(lp.OR, lang).upper()}" \
                             f" {translate_key_to(lp.CLICK_DONE_MESSAGE, lang).lower()}"
-            message.reply_text(reply_message, reply_markup=tag_editor_keyboard)
+        message.reply_text(reply_message, reply_markup=tag_editor_keyboard)
     elif current_active_module == 'music_cutter':
         try:
             beginning_sec, ending_sec = parse_cutting_range(message_text)
-        except (ValueError, BaseException):
+        except BaseException:
             reply_message = translate_key_to(lp.ERR_MALFORMED_RANGE, lang).format(
                 translate_key_to(lp.MUSIC_CUTTER_HELP, lang),
             )
@@ -621,9 +620,10 @@ def handle_responses(update: Update, context: CallbackContext) -> None:
                 save_tags_to_file(
                     file=music_path_cut,
                     tags=music_tags,
-                    new_art_path=art_path if art_path else ''
+                    new_art_path=art_path or '',
                 )
-            except (OSError, BaseException):
+
+            except BaseException:
                 update.message.reply_text(translate_key_to(lp.ERR_ON_UPDATING_TAGS, lang))
                 logger.error(
                     "Error on updating tags for file %s's file.",
@@ -654,19 +654,14 @@ def handle_responses(update: Update, context: CallbackContext) -> None:
             delete_file(music_path_cut)
 
             reset_user_data_context(context)
+    elif music_path:
+        if user_data['current_active_module']:
+            message.reply_text(
+                translate_key_to(lp.ASK_WHICH_MODULE, lang),
+                reply_markup=module_selector_keyboard
+            )
     else:
-        if music_path:
-            if user_data['current_active_module']:
-                message.reply_text(
-                    translate_key_to(lp.ASK_WHICH_MODULE, lang),
-                    reply_markup=module_selector_keyboard
-                )
-        elif not music_path:
-            message.reply_text(translate_key_to(lp.START_OVER_MESSAGE, lang))
-        else:
-            # Not implemented
-            reply_message = translate_key_to(lp.ERR_NOT_IMPLEMENTED, lang)
-            message.reply_text(reply_message)
+        message.reply_text(translate_key_to(lp.START_OVER_MESSAGE, lang))
 
 
 def display_preview(update: Update, context: CallbackContext) -> None:
@@ -678,7 +673,7 @@ def display_preview(update: Update, context: CallbackContext) -> None:
     lang = user_data['language']
 
     if art_path or new_art_path:
-        with open(new_art_path if new_art_path else art_path, "rb") as art_file:
+        with open(new_art_path or art_path, "rb") as art_file:
             message.reply_photo(
                 photo=art_file,
                 caption=f"{generate_music_info(tag_editor_context).format('')}"
@@ -717,7 +712,7 @@ def finish_editing_tags(update: Update, context: CallbackContext) -> None:
             tags=music_tags,
             new_art_path=new_art_path
         )
-    except (OSError, BaseException):
+    except BaseException:
         message.reply_text(
             translate_key_to(lp.ERR_ON_UPDATING_TAGS, lang),
             reply_markup=start_over_button_keyboard

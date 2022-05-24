@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 Model.set_connection_resolver(db)
 
 load_dotenv(verbose=True)
-OWNER_USER_ID = os.getenv("OWNER_USER_ID") if os.getenv("OWNER_USER_ID") else 0
+OWNER_USER_ID = os.getenv("OWNER_USER_ID") or 0
 OWNER_USER_ID = int(OWNER_USER_ID)
 
 Model.set_connection_resolver(db)
