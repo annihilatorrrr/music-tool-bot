@@ -29,4 +29,4 @@ pymysql = "~=1.1.0"
 [dev-packages]
 pylint = "~=2.17.4"
 autopep8 = "~=2.0.2"
-jurigged = "~=0.5.3"
+jurigged = "~=0.5.6"
